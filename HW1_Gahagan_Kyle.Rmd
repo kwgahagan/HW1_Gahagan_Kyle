@@ -1,0 +1,156 @@
+---
+title: "STAA 566 Assignment 1"
+author: "Kyle Gahagan"
+output: html_document
+knit: (function(input_file, encoding) {
+  out_dir <- 'docs';
+  rmarkdown::render(input_file,
+ encoding=encoding,
+ output_file=file.path(dirname(input_file), out_dir, 'index.html'))})
+---
+I have always wondered how a movie's budget relates to its reception, both by critics and the audience. Does an audience favorite tend to have a larger budget? Does a film trashed by critics usually have a smaller budget? To investigate this, I will use two data sets from Kaggle. To assess budget and audience score, I will use a data set that from IMDb that contains thousands of movies in the last 40 years (1980-2020). The data can be accessed here: https://www.kaggle.com/danielgrijalvas/movies. In conjunction with the IMDb data set, I will also use a data set from Metacritic, one of the most popular websites for seeing critics' numerical scores of movies. This data set is referenced here: https://www.kaggle.com/miazhx/metacritic-movie-reviews. I will combine them to look at the relationship between budget, IMDb score, and Metacritic score.
+
+First I will clean up my data and use only what we need to plot Budget by IMDb score and Budget by Metacritic score. The final data frame for plotting will contain inflation-adjusted budget, IMDb score, and Metacritic score:
+
+```{r message = FALSE, warning = FALSE, results = 'hide'}
+# Use readr package to read in imdb and metacritic csv
+library(readr)
+imdb_data <- read_csv("imdb.csv")
+metacritic_data <- read_csv("metacritic.csv")
+
+# Use dplyr to select relevant columns and rename them for the imdb data frame
+library(dplyr)
+imdb_data <-  imdb_data %>%
+  select(name, year, score, budget) %>%
+  rename(title = name, imdb_score = score)
+
+# Use dplyr to select relevant columns and rename them for the meta data frame
+metacritic_data <-  metacritic_data %>%
+  select(movie_title, metascore) %>%
+  rename(title = movie_title, meta_score = metascore)
+
+# Merge budget data with metacritic data by movie title
+# Name the merged data frame master_data
+master_data <- merge(imdb_data, metacritic_data, by = "title")
+
+# Use priceR package to adjust movie budgets for inflation up to 2020
+# Note: We use 2020 since this was the last year for the IMDb dataset
+library(priceR)
+master_data$budget_adj <- adjust_for_inflation(
+  price = master_data$budget, 
+  from_date = master_data$year, 
+  country = "US", 
+  to_date = 2020)
+
+# Remove old budget variable and year now that we adjusted for inflation
+master_data <- master_data %>%
+  select(-budget, -title, -year)
+
+# Filter out NAs in imdb_score, meta_score, and budget_adj
+master_data <- master_data %>%
+  filter(!is.na(imdb_score)) %>%
+  filter(!is.na(meta_score)) %>%
+  filter(!is.na(budget_adj))
+```
+
+Now that my data is ready for plotting, I will create two scatter plots: imdb_score vs. inflation-adjusted budget and metacritic_score vs. inflation-adjusted budget. I will arrange them into a grid with an identical y-axis for budget:
+
+```{r message = FALSE, warning = FALSE, fig.width = 7, fig.height = 7}
+# Map the data: imdb
+library(ggplot2)
+plot_imdb_budget <- ggplot(
+  data = master_data, 
+  mapping = aes(
+    x = imdb_score, 
+    y = budget_adj))
+
+# Create a scatterplot with appropriate parameters: imdb
+plot_imdb_budget <- plot_imdb_budget +
+  geom_point(
+    alpha = .8, 
+    shape = 21, 
+    size = 2, 
+    fill = "gold", 
+    color = "black")
+
+# Use Nate Silver's fivethirtyeight theme: imdb
+library(ggthemes)
+plot_imdb_budget <- plot_imdb_budget +
+  theme_fivethirtyeight()
+
+# Format axes: imdb
+library(scales)
+plot_imdb_budget <- plot_imdb_budget +
+  scale_x_continuous(
+    breaks = seq(1, 10, by = 1), 
+    limits = c(1, 10), 
+    expand = c(0, 0)) +
+  scale_y_continuous(
+    breaks = seq(0, 400000000, by = 50000000),
+    limits = c(0, 400000000),
+    expand = c(0, 0),
+    labels = unit_format(unit = "M", scale = 1e-6))
+
+# Label axes: imdb
+plot_imdb_budget <- plot_imdb_budget +
+  xlab("IMDb Score") +
+  ylab("Inflation-Adjusted Budget ($USD)") +
+  ggtitle("Movie Budget by IMDb Score")
+
+# Adjust appearance of axis labels: imdb
+plot_imdb_budget <- plot_imdb_budget +
+  theme(axis.title.x = element_text(size = 15, vjust = 0)) +
+  theme(axis.title.y = element_text(size = 15, vjust = 1)) +
+  theme(plot.title = element_text(size = 15, hjust = 0.5, vjust = 1))
+
+# Map the data: metacritic
+library(ggplot2)
+plot_meta_budget <- ggplot(
+  data = master_data, 
+  mapping = aes(
+    x = meta_score, 
+    y = budget_adj))
+
+# Create a scatterplot with appropriate parameters: metacritic
+plot_meta_budget <- plot_meta_budget +
+  geom_point(
+    alpha = .8, 
+    shape = 21, 
+    size = 2, 
+    fill = "light blue", 
+    color = "black")
+
+# Use Nate Silver's fivethirtyeight theme: metacritic
+library(ggthemes)
+plot_meta_budget <- plot_meta_budget +
+  theme_fivethirtyeight()
+
+# Format axes: metacritic
+library(scales)
+plot_meta_budget <- plot_meta_budget +
+  scale_x_continuous(
+    breaks = seq(0, 100, by = 10), 
+    limits = c(0, 102), 
+    expand = c(0, 0)) +
+  scale_y_continuous(
+    breaks = seq(0, 400000000, by = 50000000),
+    limits = c(0, 400000000),
+    expand = c(0, 0),
+    labels = unit_format(unit = "M", scale = 1e-6))
+
+# Label axes: metacritic
+plot_meta_budget <- plot_meta_budget +
+  xlab("Metacritic Score") +
+  ylab("Inflation-Adjusted Budget ($USD)") +
+  ggtitle("Movie Budget by Metacritic Score")
+
+# Adjust appearance of axis labels: metacritic
+plot_meta_budget <- plot_meta_budget +
+  theme(axis.title.x = element_text(size = 15, vjust = 0)) +
+  theme(axis.title.y = element_text(size = 15, vjust = 1)) +
+  theme(plot.title = element_text(size = 15, hjust = 0.5, vjust = 1))
+
+# Arrange plots on top of each other using gridExtra package
+library(gridExtra)
+doubleplot <- grid.arrange(plot_imdb_budget, plot_meta_budget, nrow = 2)
+```
